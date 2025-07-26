@@ -3,7 +3,7 @@ import random
 import os
 import json
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QLabel, QMenuBar, QMenu, QInputDialog, QGridLayout, QHBoxLayout, QSizePolicy, QTableWidget, QTableWidgetItem, QPushButton
+    QApplication, QWidget, QVBoxLayout, QLabel, QMenuBar, QMenu, QInputDialog, QGridLayout, QHBoxLayout, QSizePolicy, QTableWidget, QTableWidgetItem, QPushButton, QDialog, QDialogButtonBox, QCheckBox, QMessageBox
 )
 from PySide6.QtGui import QPainter, QPen, QColor, QAction
 from PySide6.QtCore import Qt, QRectF, QSize, QTimer
@@ -425,6 +425,97 @@ class DotsAndBoxesBoard(QWidget):
                 made_box = True
         return made_box
 
+class WhoGoesFirstDialog(QDialog):
+    def __init__(self, player_name, parent=None, animation_only=False, remember_checked=False, preselect=None):
+        super().__init__(parent)
+        self.setWindowTitle("Who goes first?")
+        self.selected = None
+        self.remember = False
+        self.anim_timer = QTimer(self)
+        self.anim_timer.timeout.connect(self._anim_step)
+        self.anim_index = 0
+        self.anim_list = [0, 1] * 6  # Alternates 12 times
+        self.anim_speeds = [60, 60, 80, 80, 100, 100, 120, 140, 180, 220, 300, 400]
+        self.anim_final = None
+        self.animation_only = animation_only
+        self.remember_random = False  # Track if 'remember' was checked with Random
+        self.preselect = preselect
+
+        layout = QVBoxLayout()
+        self.label = QLabel("Who should go first?" if not animation_only else "Randomly choosing who goes first...")
+        self.label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.label)
+
+        btn_layout = QHBoxLayout()
+        self.btn_player = QPushButton(player_name)
+        self.btn_computer = QPushButton("Computer")
+        btn_layout.addWidget(self.btn_player)
+        btn_layout.addWidget(self.btn_computer)
+        layout.addLayout(btn_layout)
+
+        if not animation_only:
+            self.btn_random = QPushButton("Random")
+            btn_layout.addWidget(self.btn_random)
+            self.btn_player.clicked.connect(lambda: self._choose(0))
+            self.btn_computer.clicked.connect(lambda: self._choose(1))
+            self.btn_random.clicked.connect(self._start_anim_remember)
+            self.remember_box = QCheckBox("Remember my choice")
+            self.remember_box.setChecked(remember_checked)
+            # Preselect highlight
+            if preselect == 0:
+                self.btn_player.setStyleSheet("background: #e0e0e0; font-weight: bold;")
+            elif preselect == 1:
+                self.btn_computer.setStyleSheet("background: #e0e0e0; font-weight: bold;")
+            elif preselect == 'random':
+                self.btn_random.setStyleSheet("background: #e0e0e0; font-weight: bold;")
+            layout.addWidget(self.remember_box)
+        else:
+            # In animation-only mode, disable buttons
+            self.btn_player.setEnabled(False)
+            self.btn_computer.setEnabled(False)
+            QTimer.singleShot(300, self._start_anim)
+
+        self.setLayout(layout)
+        self.setFixedWidth(340)
+
+    def _start_anim_remember(self):
+        # Called when Random is clicked in full dialog
+        self.remember_random = self.remember_box.isChecked()
+        self._start_anim()
+
+    def _choose(self, who):
+        # If this was a remembered random, set selected to 'random' for config, but return the actual result for this game
+        if hasattr(self, 'remember_random') and self.remember_random:
+            self.selected = 'random'  # For config
+            self.remember = True
+            self._actual_random_result = who  # For this game only
+            self.accept()
+        else:
+            self.selected = who
+            if not self.animation_only:
+                self.remember = self.remember_box.isChecked()
+            self.accept()
+
+    def _start_anim(self):
+        self.btn_player.setStyleSheet("")
+        self.btn_computer.setStyleSheet("")
+        self.anim_index = 0
+        self.anim_final = random.choice([0, 1])
+        self.anim_list = [0, 1] * 6 + [self.anim_final] * 2
+        self.anim_speeds = [60, 60, 80, 80, 100, 100, 120, 140, 180, 220, 300, 400, 500, 600]
+        self.anim_timer.start(self.anim_speeds[0])
+
+    def _anim_step(self):
+        idx = self.anim_list[self.anim_index]
+        self.btn_player.setStyleSheet("background: white; color: black; font-weight: bold;" if idx == 0 else "")
+        self.btn_computer.setStyleSheet("background: white; color: black; font-weight: bold;" if idx == 1 else "")
+        self.anim_index += 1
+        if self.anim_index >= len(self.anim_list):
+            self.anim_timer.stop()
+            self._choose(self.anim_final)
+        else:
+            self.anim_timer.start(self.anim_speeds[min(self.anim_index, len(self.anim_speeds)-1)])
+
 class DotsAndBoxesGame(QWidget):
     def __init__(self, grid_size=GRID_SIZE):
         super().__init__()
@@ -432,6 +523,8 @@ class DotsAndBoxesGame(QWidget):
         config = self.load_player_config()
         self.grid_size = config.get("grid_size", GRID_SIZE)
         self.player1_name = config.get("player1_name", DEFAULT_PLAYER_NAME)
+        self.who_goes_first = config.get("who_goes_first", None)  # 0=player, 1=computer, 'random', None=ask
+        self.remember_who_goes_first = config.get("remember_who_goes_first", False)
         self.menu_bar = QMenuBar(self)
         self.menu_bar.setNativeMenuBar(False)  # For cross-platform consistency
         self.game_menu = QMenu("Game", self)
@@ -451,6 +544,11 @@ class DotsAndBoxesGame(QWidget):
         self.action_new_choose.triggered.connect(self.new_game_choose)
         self.action_set_name.triggered.connect(self.set_player1_name)
         self.action_exit.triggered.connect(self.close)
+
+        # Add menu item for 'Who goes first' dialog
+        self.action_who_first = QAction("Who goes first...", self)
+        self.game_menu.addAction(self.action_who_first)
+        self.action_who_first.triggered.connect(self.show_who_goes_first_dialog)
 
         self.board = DotsAndBoxesBoard(self.grid_size, self.player1_name)
         self.board.status_callback = self.update_status
@@ -516,6 +614,9 @@ class DotsAndBoxesGame(QWidget):
         self.setLayout(layout)
         self.update_status("")
 
+        # Start a new game on app launch (shows 'Who goes first' dialog if needed)
+        QTimer.singleShot(0, lambda: self._start_new_game(self.grid_size, self.player1_name))
+
     def update_status(self, msg=None):
         player_name = self.player1_name
         computer_name = "Computer"
@@ -575,30 +676,89 @@ class DotsAndBoxesGame(QWidget):
             self.status_label.setText(msg)
 
     def new_game_same(self):
-        self._reset_board(self.grid_size, self.player1_name)
+        self._start_new_game(self.grid_size, self.player1_name)
 
     def new_game_choose(self):
         size, ok = QInputDialog.getInt(self, "Choose Grid Size", "Grid size (number of dots, 3-10):", self.grid_size, 3, 10)
         if ok:
             self.grid_size = size
             self.save_player_config(self.player1_name, self.grid_size)
-            self._reset_board(self.grid_size, self.player1_name)
+            self._start_new_game(self.grid_size, self.player1_name)
 
-    def _reset_board(self, grid_size, player1_name):
+    def _start_new_game(self, grid_size, player1_name):
+        # Who goes first logic
+        # Always reload config to get latest values
+        config = self.load_player_config()
+        self.who_goes_first = config.get("who_goes_first", None)
+        self.remember_who_goes_first = config.get("remember_who_goes_first", False)
+        who_first = self.who_goes_first if self.remember_who_goes_first else None
+        if who_first is None:
+            dlg = WhoGoesFirstDialog(player1_name, self)
+            if dlg.exec() == QDialog.Accepted:
+                # If Random was chosen and remember is checked, store 'random' in config, but use the actual result for this game
+                if hasattr(dlg, 'remember_random') and dlg.remember_random:
+                    self.who_goes_first = 'random'
+                    self.remember_who_goes_first = True
+                    self.save_player_config(player1_name, grid_size, 'random', True)
+                    who_first = dlg._actual_random_result
+                else:
+                    who_first = dlg.selected
+                    self.remember_who_goes_first = dlg.remember
+                    if dlg.remember:
+                        self.who_goes_first = dlg.selected
+                    else:
+                        self.who_goes_first = None
+                    self.save_player_config(player1_name, grid_size, self.who_goes_first if self.remember_who_goes_first else None, self.remember_who_goes_first)
+        if who_first == 'random':
+            # Show only the animation dialog
+            dlg = WhoGoesFirstDialog(player1_name, self, animation_only=True)
+            if dlg.exec() == QDialog.Accepted:
+                who_first = dlg.selected
         self.layout().removeWidget(self.board)
         self.board.deleteLater()
         self.board = DotsAndBoxesBoard(grid_size, player1_name)
         self.board.status_callback = self.update_status
         self.layout().insertWidget(1, self.board)  # after scoreboard
         self.update_status("")
-        self.save_player_config(player1_name, grid_size)
+        # Set who goes first
+        if who_first == 1:
+            self.board.current_player = 1
+            QTimer.singleShot(400, self.board.computer_move)
+        else:
+            self.board.current_player = 0
+        self.save_player_config(player1_name, grid_size, self.who_goes_first if self.remember_who_goes_first else None, self.remember_who_goes_first)
+
+    def show_who_goes_first_dialog(self):
+        # Determine preselect value
+        preselect = None
+        if self.remember_who_goes_first:
+            preselect = self.who_goes_first
+        dlg = WhoGoesFirstDialog(
+            self.player1_name,
+            self,
+            animation_only=False,
+            remember_checked=self.remember_who_goes_first,
+            preselect=preselect
+        )
+        if dlg.exec() == QDialog.Accepted:
+            self.who_goes_first = dlg.selected
+            self.remember_who_goes_first = dlg.remember
+            self.save_player_config(self.player1_name, self.grid_size, self.who_goes_first if self.remember_who_goes_first else None, self.remember_who_goes_first)
+            # If the game hasn't started, restart automatically
+            if not self.game_has_started():
+                self._start_new_game(self.grid_size, self.player1_name)
+            else:
+                # Prompt to restart
+                reply = QMessageBox.question(self, "Restart Game?", "Start a new game now with this setting?", QMessageBox.Yes | QMessageBox.No)
+                if reply == QMessageBox.Yes:
+                    self._start_new_game(self.grid_size, self.player1_name)
 
     def set_player1_name(self):
         name, ok = QInputDialog.getText(self, "Set Player 1 Name", "Enter Player 1's name:", text=self.player1_name)
         if ok and name.strip():
             self.player1_name = name.strip()
-            self.save_player_config(self.player1_name, self.grid_size)
-            self._reset_board(self.grid_size, self.player1_name)
+            self.save_player_config(self.player1_name, self.grid_size, self.who_goes_first if self.remember_who_goes_first else None, self.remember_who_goes_first)
+            self._start_new_game(self.grid_size, self.player1_name)
 
     def load_player_config(self):
         config_path = os.path.join(os.path.dirname(__file__), "player_config.json")
@@ -611,16 +771,32 @@ class DotsAndBoxesGame(QWidget):
                 return {}
         return {}
 
-    def save_player_config(self, player1_name, grid_size):
+    def save_player_config(self, player1_name, grid_size, who_goes_first=None, remember_who_goes_first=False):
         config_path = os.path.join(os.path.dirname(__file__), "player_config.json")
         try:
             with open(config_path, "w", encoding="utf-8") as f:
-                json.dump({"player1_name": player1_name, "grid_size": grid_size}, f)
+                json.dump({
+                    "player1_name": player1_name,
+                    "grid_size": grid_size,
+                    "who_goes_first": who_goes_first,
+                    "remember_who_goes_first": remember_who_goes_first
+                }, f)
         except Exception:
             pass
 
     def handle_show_last_move(self):
         self.board.show_last_move()
+
+    def game_has_started(self):
+        # Returns True if any move has been made
+        if hasattr(self, 'board') and self.board:
+            for row in self.board.h_lines:
+                if any(row):
+                    return True
+            for row in self.board.v_lines:
+                if any(row):
+                    return True
+        return False
 
 def main():
     app = QApplication(sys.argv)
