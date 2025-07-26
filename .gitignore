@@ -1,0 +1,15 @@
+#  App exclusions
+player_config.json
+
+#  Python exclusions
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pywz
+*.pyzw
+*.pyzwz
+
