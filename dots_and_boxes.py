@@ -546,14 +546,14 @@ class DotsAndBoxesGame(QWidget):
         self.dark_mode = config.get("dark_mode", None)
         self.menu_bar = QMenuBar(self)
         self.menu_bar.setNativeMenuBar(False)  # For cross-platform consistency
-        self.game_menu = QMenu("Game", self)
+        self.game_menu = QMenu("Game Menu", self)
         self.menu_bar.addMenu(self.game_menu)
 
         self.action_new_same = QAction("New Game (Same Grid Size)", self)
         self.action_new_choose = QAction("New Game (Choose Grid Size)", self)
         self.action_set_name = QAction("Set Player 1 Name", self)
         self.action_who_first = QAction("Who goes first...", self)
-        self.action_toggle_dark = QAction("Toggle Dark Mode", self)
+        self.action_toggle_dark = QAction("Toggle Dark/Light Mode", self)
         self.action_exit = QAction("Exit", self)
         self.game_menu.addAction(self.action_new_same)
         self.game_menu.addAction(self.action_new_choose)
