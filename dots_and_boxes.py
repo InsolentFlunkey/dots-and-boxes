@@ -46,10 +46,17 @@ class DotsAndBoxesBoard(QWidget):
         self.hovered_line = None  # (r, c, is_h) or None
 
     def paintEvent(self, event):
+        # NOTE: This method name must remain 'paintEvent' to override the Qt event handler.
+        # Renaming to 'paint_event' (PEP8) would break PySide6/Qt event dispatch.
         qp = QPainter(self)
         qp.setRenderHint(QPainter.Antialiasing)
+        self._draw_dots(qp)
+        self._draw_horizontal_lines(qp)
+        self._draw_vertical_lines(qp)
+        self._draw_hover_shadows(qp)
+        self._draw_claimed_boxes(qp)
 
-        # Draw dots
+    def _draw_dots(self, qp):
         for r in range(self.grid_size):
             for c in range(self.grid_size):
                 qp.setBrush(Qt.black)
@@ -57,22 +64,43 @@ class DotsAndBoxesBoard(QWidget):
                 y = PADDING + r * BOX_SIZE
                 qp.drawEllipse(QRectF(x - DOT_RADIUS, y - DOT_RADIUS, 2 * DOT_RADIUS, 2 * DOT_RADIUS))
 
-        # Draw horizontal lines
+    def _draw_horizontal_lines(self, qp):
         for r in range(self.grid_size):
             for c in range(self.grid_size - 1):
-                is_last = self.blinking and self.blink_target and (r, c, True) == self.blink_target
-                if self.h_lines[r][c] and not (is_last and not self.blink_state):
+                self._draw_single_horizontal_line(qp, r, c)
+
+    def _draw_single_horizontal_line(self, qp, r, c):
+        is_last = self.blinking and self.blink_target and (r, c, True) == self.blink_target
+        if self.h_lines[r][c] and not (is_last and not self.blink_state):
+            qp.setPen(QPen(
+                Qt.blue if not is_last or self.blink_state else Qt.gray, 
+                LINE_THICKNESS, 
+                Qt.SolidLine if not is_last or self.blink_state else Qt.DashLine
+            ))
+            x1 = PADDING + c * BOX_SIZE + DOT_RADIUS
+            y1 = PADDING + r * BOX_SIZE
+            x2 = PADDING + (c + 1) * BOX_SIZE - DOT_RADIUS
+            y2 = y1
+            qp.drawLine(x1, y1, x2, y2)
+
+    def _draw_vertical_lines(self, qp):
+        for r in range(self.grid_size - 1):
+            for c in range(self.grid_size):
+                is_last = self.blinking and self.blink_target and (r, c, False) == self.blink_target
+                if self.v_lines[r][c] and not (is_last and not self.blink_state):
                     qp.setPen(QPen(
-                        Qt.blue if not is_last or self.blink_state else Qt.gray, 
-                        LINE_THICKNESS, 
-                        Qt.SolidLine if not is_last or self.blink_state else Qt.DashLine
-                        ))
-                    x1 = PADDING + c * BOX_SIZE + DOT_RADIUS
-                    y1 = PADDING + r * BOX_SIZE
-                    x2 = PADDING + (c + 1) * BOX_SIZE - DOT_RADIUS
-                    y2 = y1
+                        Qt.red if not is_last or self.blink_state else Qt.gray, LINE_THICKNESS
+                    ))
+                    x1 = PADDING + c * BOX_SIZE
+                    y1 = PADDING + r * BOX_SIZE + DOT_RADIUS
+                    x2 = x1
+                    y2 = PADDING + (r + 1) * BOX_SIZE - DOT_RADIUS
                     qp.drawLine(x1, y1, x2, y2)
-                # Draw hover shadow for horizontal line
+
+    def _draw_hover_shadows(self, qp):
+        # Horizontal hover
+        for r in range(self.grid_size):
+            for c in range(self.grid_size - 1):
                 if (
                     self.hovered_line
                     and self.hovered_line == (r, c, True)
@@ -85,21 +113,9 @@ class DotsAndBoxesBoard(QWidget):
                     x2 = PADDING + (c + 1) * BOX_SIZE - DOT_RADIUS
                     y2 = y1
                     qp.drawLine(x1, y1, x2, y2)
-
-        # Draw vertical lines
+        # Vertical hover
         for r in range(self.grid_size - 1):
             for c in range(self.grid_size):
-                is_last = self.blinking and self.blink_target and (r, c, False) == self.blink_target
-                if self.v_lines[r][c] and not (is_last and not self.blink_state):
-                    qp.setPen(QPen(
-                        Qt.red if not is_last or self.blink_state else Qt.gray, LINE_THICKNESS
-                        ))
-                    x1 = PADDING + c * BOX_SIZE
-                    y1 = PADDING + r * BOX_SIZE + DOT_RADIUS
-                    x2 = x1
-                    y2 = PADDING + (r + 1) * BOX_SIZE - DOT_RADIUS
-                    qp.drawLine(x1, y1, x2, y2)
-                # Draw hover shadow for vertical line
                 if (
                     self.hovered_line
                     and self.hovered_line == (r, c, False)
@@ -113,7 +129,7 @@ class DotsAndBoxesBoard(QWidget):
                     y2 = PADDING + (r + 1) * BOX_SIZE - DOT_RADIUS
                     qp.drawLine(x1, y1, x2, y2)
 
-        # Draw claimed boxes
+    def _draw_claimed_boxes(self, qp):
         for r in range(self.grid_size - 1):
             for c in range(self.grid_size - 1):
                 owner = self.boxes[r][c]
