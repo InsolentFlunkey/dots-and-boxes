@@ -3,7 +3,9 @@ import random
 import os
 import json
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QLabel, QMenuBar, QMenu, QInputDialog, QGridLayout, QHBoxLayout, QSizePolicy, QTableWidget, QTableWidgetItem, QPushButton, QDialog, QDialogButtonBox, QCheckBox, QMessageBox, QRadioButton, QButtonGroup
+    QApplication, QWidget, QVBoxLayout, QLabel, QMenuBar, QMenu, 
+    QInputDialog, QHBoxLayout, QSizePolicy, QTableWidget, QTableWidgetItem, 
+    QPushButton, QDialog, QDialogButtonBox, QCheckBox, QRadioButton, QButtonGroup, QMessageBox
 )
 from PySide6.QtGui import QPainter, QPen, QColor, QAction
 from PySide6.QtCore import Qt, QRectF, QSize, QTimer
@@ -60,7 +62,11 @@ class DotsAndBoxesBoard(QWidget):
             for c in range(self.grid_size - 1):
                 is_last = self.blinking and self.blink_target and (r, c, True) == self.blink_target
                 if self.h_lines[r][c] and not (is_last and not self.blink_state):
-                    qp.setPen(QPen(Qt.blue if not is_last or self.blink_state else Qt.gray, LINE_THICKNESS))
+                    qp.setPen(QPen(
+                        Qt.blue if not is_last or self.blink_state else Qt.gray, 
+                        LINE_THICKNESS, 
+                        Qt.SolidLine if not is_last or self.blink_state else Qt.DashLine
+                        ))
                     x1 = PADDING + c * BOX_SIZE + DOT_RADIUS
                     y1 = PADDING + r * BOX_SIZE
                     x2 = PADDING + (c + 1) * BOX_SIZE - DOT_RADIUS
@@ -85,7 +91,9 @@ class DotsAndBoxesBoard(QWidget):
             for c in range(self.grid_size):
                 is_last = self.blinking and self.blink_target and (r, c, False) == self.blink_target
                 if self.v_lines[r][c] and not (is_last and not self.blink_state):
-                    qp.setPen(QPen(Qt.red if not is_last or self.blink_state else Qt.gray, LINE_THICKNESS))
+                    qp.setPen(QPen(
+                        Qt.red if not is_last or self.blink_state else Qt.gray, LINE_THICKNESS
+                        ))
                     x1 = PADDING + c * BOX_SIZE
                     y1 = PADDING + r * BOX_SIZE + DOT_RADIUS
                     x2 = x1
@@ -426,7 +434,19 @@ class DotsAndBoxesBoard(QWidget):
         return made_box
 
 class WhoGoesFirstDialog(QDialog):
-    def __init__(self, player_name, parent=None, animation_only=False, remember_checked=False, preselect=None):
+    def __init__(
+        self, player_name, parent=None, 
+        animation_only=False, remember_checked=False, preselect=None
+        ):
+        
+        """
+        Dialog for selecting who goes first.
+        :param player_name: Name of the player
+        :param parent: Parent widget
+        :param animation_only: If True, only show the animation
+        :param remember_checked: If True, remember the choice
+        :param preselect: Preselect a choice (0=player, 1=computer, 'random')
+        """
         super().__init__(parent)
         self.setWindowTitle("Who goes first?")
         self.selected = None
@@ -442,7 +462,9 @@ class WhoGoesFirstDialog(QDialog):
         self.preselect = preselect
 
         layout = QVBoxLayout()
-        self.label = QLabel("Who should go first?" if not animation_only else "Randomly choosing who goes first...")
+        self.label = QLabel(
+            "Who should go first?" if not animation_only else "Randomly choosing who goes first..."
+            )
         self.label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.label)
 
@@ -729,7 +751,10 @@ class DotsAndBoxesGame(QWidget):
             QTimer.singleShot(400, self.board.computer_move)
         else:
             self.board.current_player = 0
-        self.save_player_config(player1_name, grid_size, self.who_goes_first if self.remember_who_goes_first else None, self.remember_who_goes_first)
+        self.save_player_config(
+            player1_name, grid_size, self.who_goes_first if self.remember_who_goes_first else None, 
+            self.remember_who_goes_first
+            )
 
     def show_who_goes_first_dialog(self):
         # Determine preselect value
