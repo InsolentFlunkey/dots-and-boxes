@@ -3,7 +3,7 @@ import random
 import os
 import json
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QLabel, QMenuBar, QMenu, QInputDialog, QGridLayout, QHBoxLayout, QSizePolicy, QTableWidget, QTableWidgetItem
+    QApplication, QWidget, QVBoxLayout, QLabel, QMenuBar, QMenu, QInputDialog, QGridLayout, QHBoxLayout, QSizePolicy, QTableWidget, QTableWidgetItem, QPushButton
 )
 from PySide6.QtGui import QPainter, QPen, QColor, QAction
 from PySide6.QtCore import Qt, QRectF, QSize, QTimer
@@ -33,6 +33,15 @@ class DotsAndBoxesBoard(QWidget):
         )
         self.status_callback = None
         self.game_over = False
+        self.last_move = None  # (r, c, is_h)
+        self.blinking = False
+        self.blink_state = False
+        self.blink_timer = QTimer(self)
+        self.blink_timer.timeout.connect(self._blink_step)
+        self.blink_count = 0
+        self.blink_target = None
+        self.setMouseTracking(True)
+        self.hovered_line = None  # (r, c, is_h) or None
 
     def paintEvent(self, event):
         qp = QPainter(self)
@@ -47,10 +56,24 @@ class DotsAndBoxesBoard(QWidget):
                 qp.drawEllipse(QRectF(x - DOT_RADIUS, y - DOT_RADIUS, 2 * DOT_RADIUS, 2 * DOT_RADIUS))
 
         # Draw horizontal lines
-        qp.setPen(QPen(Qt.blue, LINE_THICKNESS))
         for r in range(self.grid_size):
             for c in range(self.grid_size - 1):
-                if self.h_lines[r][c]:
+                is_last = self.blinking and self.blink_target and (r, c, True) == self.blink_target
+                if self.h_lines[r][c] and not (is_last and not self.blink_state):
+                    qp.setPen(QPen(Qt.blue if not is_last or self.blink_state else Qt.gray, LINE_THICKNESS))
+                    x1 = PADDING + c * BOX_SIZE + DOT_RADIUS
+                    y1 = PADDING + r * BOX_SIZE
+                    x2 = PADDING + (c + 1) * BOX_SIZE - DOT_RADIUS
+                    y2 = y1
+                    qp.drawLine(x1, y1, x2, y2)
+                # Draw hover shadow for horizontal line
+                if (
+                    self.hovered_line
+                    and self.hovered_line == (r, c, True)
+                    and not self.h_lines[r][c]
+                    and not self.blinking
+                ):
+                    qp.setPen(QPen(QColor(100, 100, 255, 120), LINE_THICKNESS + 2, Qt.DashLine))
                     x1 = PADDING + c * BOX_SIZE + DOT_RADIUS
                     y1 = PADDING + r * BOX_SIZE
                     x2 = PADDING + (c + 1) * BOX_SIZE - DOT_RADIUS
@@ -58,10 +81,24 @@ class DotsAndBoxesBoard(QWidget):
                     qp.drawLine(x1, y1, x2, y2)
 
         # Draw vertical lines
-        qp.setPen(QPen(Qt.red, LINE_THICKNESS))
         for r in range(self.grid_size - 1):
             for c in range(self.grid_size):
-                if self.v_lines[r][c]:
+                is_last = self.blinking and self.blink_target and (r, c, False) == self.blink_target
+                if self.v_lines[r][c] and not (is_last and not self.blink_state):
+                    qp.setPen(QPen(Qt.red if not is_last or self.blink_state else Qt.gray, LINE_THICKNESS))
+                    x1 = PADDING + c * BOX_SIZE
+                    y1 = PADDING + r * BOX_SIZE + DOT_RADIUS
+                    x2 = x1
+                    y2 = PADDING + (r + 1) * BOX_SIZE - DOT_RADIUS
+                    qp.drawLine(x1, y1, x2, y2)
+                # Draw hover shadow for vertical line
+                if (
+                    self.hovered_line
+                    and self.hovered_line == (r, c, False)
+                    and not self.v_lines[r][c]
+                    and not self.blinking
+                ):
+                    qp.setPen(QPen(QColor(255, 100, 100, 120), LINE_THICKNESS + 2, Qt.DashLine))
                     x1 = PADDING + c * BOX_SIZE
                     y1 = PADDING + r * BOX_SIZE + DOT_RADIUS
                     x2 = x1
@@ -91,8 +128,34 @@ class DotsAndBoxesBoard(QWidget):
                         text
                     )
 
+    def _start_blink(self, move, blinks=2):
+        self.blinking = True
+        self.blink_target = move
+        self.blink_count = 0
+        self.blink_state = True
+        self.blink_total = blinks * 2  # on/off cycles
+        self.blink_timer.start(120)
+        self.update()
+
+    def _blink_step(self):
+        self.blink_state = not self.blink_state
+        self.blink_count += 1
+        self.update()
+        if self.blink_count >= self.blink_total:
+            self.blink_timer.stop()
+            self.blinking = False
+            self.blink_target = None
+            self.update()
+            # If it's the computer's turn and the game isn't over, trigger computer move
+            if self.current_player == 1 and not self.game_over:
+                QTimer.singleShot(100, self.computer_move)
+
+    def show_last_move(self):
+        if self.last_move:
+            self._start_blink(self.last_move, blinks=3)
+
     def mousePressEvent(self, event):
-        if self.current_player != 0 or self.game_over:
+        if self.current_player != 0 or self.game_over or self.blinking:
             return
 
         pos = event.position() if hasattr(event, 'position') else event.pos()
@@ -109,6 +172,8 @@ class DotsAndBoxesBoard(QWidget):
                 return
             self.v_lines[r][c] = True
 
+        self.last_move = (r, c, is_h)
+        self._start_blink(self.last_move)
         made_box = self.check_and_update_boxes()
         self.update()
         self.update_status()
@@ -116,6 +181,32 @@ class DotsAndBoxesBoard(QWidget):
             self.current_player = 1
             self.update_status()
             QTimer.singleShot(400, self.computer_move)
+
+    def mouseMoveEvent(self, event):
+        if self.blinking or self.game_over or self.current_player != 0:
+            if self.hovered_line is not None:
+                self.hovered_line = None
+                self.update()
+            return
+        pos = event.position() if hasattr(event, 'position') else event.pos()
+        r, c, is_h = self.detect_line_clicked(pos.x(), pos.y())
+        if r is not None:
+            if is_h and not self.h_lines[r][c]:
+                new_hover = (r, c, True)
+            elif not is_h and not self.v_lines[r][c]:
+                new_hover = (r, c, False)
+            else:
+                new_hover = None
+        else:
+            new_hover = None
+        if new_hover != self.hovered_line:
+            self.hovered_line = new_hover
+            self.update()
+
+    def leaveEvent(self, event):
+        if self.hovered_line is not None:
+            self.hovered_line = None
+            self.update()
 
     def detect_line_clicked(self, x, y):
         # Check h_lines
@@ -184,7 +275,7 @@ class DotsAndBoxesBoard(QWidget):
             self.status_callback("")
 
     def computer_move(self):
-        if self.current_player != 1 or self.game_over:
+        if self.current_player != 1 or self.game_over or self.blinking:
             return
         moves = self.available_moves()
         # Prefer moves that complete a box
@@ -193,6 +284,8 @@ class DotsAndBoxesBoard(QWidget):
             test.make_move(*move, player=1)
             if test.check_and_update_boxes_for_move(*move, player=1):
                 self.make_move(*move)
+                self.last_move = move
+                self._start_blink(self.last_move)
                 made_box = self.check_and_update_boxes()
                 self.update()
                 self.update_status()
@@ -212,6 +305,8 @@ class DotsAndBoxesBoard(QWidget):
         else:
             move = random.choice(moves)
         self.make_move(*move)
+        self.last_move = move
+        self._start_blink(self.last_move)
         made_box = self.check_and_update_boxes()
         self.update()
         self.update_status()
@@ -292,6 +387,11 @@ class DotsAndBoxesBoard(QWidget):
         new.current_player = self.current_player
         new.scores = self.scores[:]
         new.game_over = self.game_over
+        new.last_move = self.last_move
+        new.blinking = self.blinking
+        new.blink_state = self.blink_state
+        new.blink_count = self.blink_count
+        new.blink_target = self.blink_target
         return new
 
     def make_move(self, r, c, is_h, player=None):
@@ -329,8 +429,9 @@ class DotsAndBoxesGame(QWidget):
     def __init__(self, grid_size=GRID_SIZE):
         super().__init__()
         self.setWindowTitle("Dots and Boxes (Squares)")
-        self.grid_size = grid_size
-        self.player1_name = self.load_player1_name() or DEFAULT_PLAYER_NAME
+        config = self.load_player_config()
+        self.grid_size = config.get("grid_size", GRID_SIZE)
+        self.player1_name = config.get("player1_name", DEFAULT_PLAYER_NAME)
         self.menu_bar = QMenuBar(self)
         self.menu_bar.setNativeMenuBar(False)  # For cross-platform consistency
         self.game_menu = QMenu("Game", self)
@@ -389,6 +490,10 @@ class DotsAndBoxesGame(QWidget):
         self.status_label.setAlignment(Qt.AlignCenter)
         self.status_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
+        # Show last move button
+        self.show_last_move_btn = QPushButton("Show last move")
+        self.show_last_move_btn.clicked.connect(self.handle_show_last_move)
+
         # Center the scoreboard
         layout = QVBoxLayout()
         layout.setMenuBar(self.menu_bar)
@@ -398,6 +503,7 @@ class DotsAndBoxesGame(QWidget):
         scoreboard_hbox.addStretch(1)
         layout.addLayout(scoreboard_hbox)
         layout.addWidget(self.board)
+        layout.addWidget(self.show_last_move_btn)
         layout.addWidget(self.status_label)
         self.setLayout(layout)
         self.update_status("")
@@ -467,6 +573,7 @@ class DotsAndBoxesGame(QWidget):
         size, ok = QInputDialog.getInt(self, "Choose Grid Size", "Grid size (number of dots, 3-10):", self.grid_size, 3, 10)
         if ok:
             self.grid_size = size
+            self.save_player_config(self.player1_name, self.grid_size)
             self._reset_board(self.grid_size, self.player1_name)
 
     def _reset_board(self, grid_size, player1_name):
@@ -476,32 +583,36 @@ class DotsAndBoxesGame(QWidget):
         self.board.status_callback = self.update_status
         self.layout().insertWidget(1, self.board)  # after scoreboard
         self.update_status("")
+        self.save_player_config(player1_name, grid_size)
 
     def set_player1_name(self):
         name, ok = QInputDialog.getText(self, "Set Player 1 Name", "Enter Player 1's name:", text=self.player1_name)
         if ok and name.strip():
             self.player1_name = name.strip()
-            self.save_player1_name(self.player1_name)
+            self.save_player_config(self.player1_name, self.grid_size)
             self._reset_board(self.grid_size, self.player1_name)
 
-    def load_player1_name(self):
+    def load_player_config(self):
         config_path = os.path.join(os.path.dirname(__file__), "player_config.json")
         if os.path.exists(config_path):
             try:
                 with open(config_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    return data.get("player1_name", DEFAULT_PLAYER_NAME)
+                    return data
             except Exception:
-                return DEFAULT_PLAYER_NAME
-        return DEFAULT_PLAYER_NAME
+                return {}
+        return {}
 
-    def save_player1_name(self, name):
+    def save_player_config(self, player1_name, grid_size):
         config_path = os.path.join(os.path.dirname(__file__), "player_config.json")
         try:
             with open(config_path, "w", encoding="utf-8") as f:
-                json.dump({"player1_name": name}, f)
+                json.dump({"player1_name": player1_name, "grid_size": grid_size}, f)
         except Exception:
             pass
+
+    def handle_show_last_move(self):
+        self.board.show_last_move()
 
 def main():
     app = QApplication(sys.argv)

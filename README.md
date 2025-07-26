@@ -68,6 +68,10 @@ This project is intended to be **expanded and improved**. Some ideas for future 
 - [ ] **Game saving/loading**
 - [ ] **Score/history tracking**
 - [ ] **Packaging as an executable for Windows/macOS/Linux**
+- [ ] Remember the selected grid size between sessions (store in player_config.json)
+- [ ] Blink the line when a move is made (especially for computer moves)
+- [ ] Add a 'Show last move' button to blink the last line
+- [ ] Show a shadow/preview of the line on mouse hover before clicking
 
 ---
 
