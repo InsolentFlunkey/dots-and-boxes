@@ -286,32 +286,26 @@ class DotsAndBoxesBoard(QWidget):
         if self.current_player != 1 or self.game_over or self.blinking:
             return
         moves = self.available_moves()
-        # Prefer moves that complete a box
+        move = self._find_box_completing_move(moves)
+        if move is None:
+            move = self._find_safe_move(moves)
+        if move is None:
+            move = random.choice(moves)
+        self._execute_computer_move(move)
+
+    def _find_box_completing_move(self, moves):
         for move in moves:
             test = self.copy_state()
             test.make_move(*move, player=1)
             if test.check_and_update_boxes_for_move(*move, player=1):
-                self.make_move(*move)
-                self.last_move = move
-                self._start_blink(self.last_move)
-                made_box = self.check_and_update_boxes()
-                self.update()
-                self.update_status()
-                if made_box:
-                    QTimer.singleShot(400, self.computer_move)
-                else:
-                    self.current_player = 0
-                    self.update_status()
-                return
-        # Otherwise, avoid making third side of a box
-        safe_moves = []
-        for move in moves:
-            if not self.move_makes_third_side(move):
-                safe_moves.append(move)
-        if safe_moves:
-            move = random.choice(safe_moves)
-        else:
-            move = random.choice(moves)
+                return move
+        return None
+
+    def _find_safe_move(self, moves):
+        safe_moves = [move for move in moves if not self.move_makes_third_side(move)]
+        return random.choice(safe_moves) if safe_moves else None
+
+    def _execute_computer_move(self, move):
         self.make_move(*move)
         self.last_move = move
         self._start_blink(self.last_move)
