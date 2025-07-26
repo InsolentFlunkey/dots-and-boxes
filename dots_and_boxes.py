@@ -334,51 +334,27 @@ class DotsAndBoxesBoard(QWidget):
         r, c, is_h = move
         if is_h:
             # Top box
-            if r > 0:
-                n = 0
-                if self.h_lines[r - 1][c]:
-                    n += 1
-                if self.v_lines[r - 1][c]:
-                    n += 1
-                if self.v_lines[r - 1][c + 1]:
-                    n += 1
-                if n == 2:
-                    return True
+            if r > 0 and self._box_has_two_sides(self.h_lines, self.v_lines, r - 1, c):
+                return True
             # Bottom box
-            if r < self.grid_size - 1:
-                n = 0
-                if self.h_lines[r + 1][c]:
-                    n += 1
-                if self.v_lines[r][c]:
-                    n += 1
-                if self.v_lines[r][c + 1]:
-                    n += 1
-                if n == 2:
-                    return True
+            if r < self.grid_size - 1 and self._box_has_two_sides(self.h_lines, self.v_lines, r, c):
+                return True
         else:
             # Left box
-            if c > 0:
-                n = 0
-                if self.v_lines[r][c - 1]:
-                    n += 1
-                if self.h_lines[r][c - 1]:
-                    n += 1
-                if self.h_lines[r + 1][c - 1]:
-                    n += 1
-                if n == 2:
-                    return True
+            if c > 0 and self._box_has_two_sides(self.h_lines, self.v_lines, r, c - 1):
+                return True
             # Right box
-            if c < self.grid_size - 1:
-                n = 0
-                if self.v_lines[r][c + 1]:
-                    n += 1
-                if self.h_lines[r][c]:
-                    n += 1
-                if self.h_lines[r + 1][c]:
-                    n += 1
-                if n == 2:
-                    return True
+            if c < self.grid_size - 1 and self._box_has_two_sides(self.h_lines, self.v_lines, r, c):
+                return True
         return False
+
+    def _box_has_two_sides(self, h_lines, v_lines, r, c):
+        n = 0
+        if h_lines[r][c]: n += 1
+        if h_lines[r + 1][c]: n += 1
+        if v_lines[r][c]: n += 1
+        if v_lines[r][c + 1]: n += 1
+        return n == 2
 
     def copy_state(self):
         new = DotsAndBoxesBoard()
