@@ -840,64 +840,110 @@ class DotsAndBoxesGame(QWidget):
     def apply_dark_mode(self, enabled):
         app = QApplication.instance()
         if enabled:
+            # Cobalt blue-gray dark mode
             dark_palette = QPalette()
-            dark_palette.setColor(QPalette.Window, QColor(30, 30, 30))
+            dark_palette.setColor(QPalette.Window, QColor('#22304a'))
             dark_palette.setColor(QPalette.WindowText, Qt.white)
-            dark_palette.setColor(QPalette.Base, QColor(20, 20, 20))
-            dark_palette.setColor(QPalette.AlternateBase, QColor(30, 30, 30))
+            dark_palette.setColor(QPalette.Base, QColor('#22304a'))
+            dark_palette.setColor(QPalette.AlternateBase, QColor('#2a3a5a'))
             dark_palette.setColor(QPalette.ToolTipBase, Qt.white)
             dark_palette.setColor(QPalette.ToolTipText, Qt.white)
             dark_palette.setColor(QPalette.Text, Qt.white)
-            dark_palette.setColor(QPalette.Button, QColor(45, 45, 45))
+            dark_palette.setColor(QPalette.Button, QColor('#2a3a5a'))
             dark_palette.setColor(QPalette.ButtonText, Qt.white)
-            dark_palette.setColor(QPalette.BrightText, Qt.red)
-            dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
-            dark_palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-            dark_palette.setColor(QPalette.HighlightedText, Qt.black)
+            dark_palette.setColor(QPalette.BrightText, QColor('#3a7bd5'))
+            dark_palette.setColor(QPalette.Link, QColor('#3a7bd5'))
+            dark_palette.setColor(QPalette.Highlight, QColor('#3a7bd5'))
+            dark_palette.setColor(QPalette.HighlightedText, Qt.white)
+            dark_palette.setColor(QPalette.Light, QColor('#3a7bd5'))
+            dark_palette.setColor(QPalette.Mid, QColor('#3a4a6a'))
+            dark_palette.setColor(QPalette.Midlight, QColor('#2a3a5a'))
+            dark_palette.setColor(QPalette.Dark, QColor('#1a2233'))
+            dark_palette.setColor(QPalette.Shadow, QColor('#1a2233'))
             app.setPalette(dark_palette)
             self._set_scoreboard_text_color('white')
             app.setStyleSheet("""
-                QMenu { background-color: #222; color: white; }
-                QMenu::item:selected { background: #444; }
-            """)
+                QMenu {
+                    background-color: #2a3a5a;
+                    color: white;
+                    border: 1px solid #3a4a6a;
+                    border-radius: 8px;
+                    padding: 4px;
+                }
+                QMenu::item:selected {
+                    background: #3a7bd5;
+                    color: white;
+                }
+            """
+            )
             self.show_last_move_btn.setStyleSheet(
                 """
                 QPushButton {
                     padding: 6px 18px;
-                    background: #333;
+                    background: #2a3a5a;
                     color: white;
-                    border: 1px solid #888;
+                    border: 1px solid #3a4a6a;
                     border-radius: 6px;
                 }
                 QPushButton:hover {
-                    background: #444;
+                    background: #3a4a6a;
                 }
                 QPushButton:pressed {
-                    background: #222;
+                    background: #22304a;
                 }
                 """
             )
         else:
-            app.setPalette(app.style().standardPalette())
-            self._set_scoreboard_text_color('black')
+            # Blue-gray light mode
+            light_palette = QPalette()
+            light_palette.setColor(QPalette.Window, QColor('#f4f7fb'))
+            light_palette.setColor(QPalette.WindowText, QColor('#222b3a'))
+            light_palette.setColor(QPalette.Base, QColor('#eaf0fa'))
+            light_palette.setColor(QPalette.AlternateBase, QColor('#f4f7fb'))
+            light_palette.setColor(QPalette.ToolTipBase, QColor('#f4f7fb'))
+            light_palette.setColor(QPalette.ToolTipText, QColor('#222b3a'))
+            light_palette.setColor(QPalette.Text, QColor('#222b3a'))
+            light_palette.setColor(QPalette.Button, QColor('#eaf0fa'))
+            light_palette.setColor(QPalette.ButtonText, QColor('#222b3a'))
+            light_palette.setColor(QPalette.BrightText, QColor('#3a7bd5'))
+            light_palette.setColor(QPalette.Link, QColor('#3a7bd5'))
+            light_palette.setColor(QPalette.Highlight, QColor('#3a7bd5'))
+            light_palette.setColor(QPalette.HighlightedText, QColor('#222b3a'))
+            light_palette.setColor(QPalette.Light, QColor('#3a7bd5'))
+            light_palette.setColor(QPalette.Mid, QColor('#b0bed9'))
+            light_palette.setColor(QPalette.Midlight, QColor('#eaf0fa'))
+            light_palette.setColor(QPalette.Dark, QColor('#b0bed9'))
+            light_palette.setColor(QPalette.Shadow, QColor('#b0bed9'))
+            app.setPalette(light_palette)
+            self._set_scoreboard_text_color('#222b3a')
             app.setStyleSheet("""
-                QMenu { background-color: #f0f0f0; color: black; }
-                QMenu::item:selected { background: #d0d0d0; }
-            """)
+                QMenu {
+                    background-color: #eaf0fa;
+                    color: #222b3a;
+                    border: 1px solid #b0bed9;
+                    border-radius: 8px;
+                    padding: 4px;
+                }
+                QMenu::item:selected {
+                    background: #3a7bd5;
+                    color: white;
+                }
+            """
+            )
             self.show_last_move_btn.setStyleSheet(
                 """
                 QPushButton {
                     padding: 6px 18px;
-                    background: #f8f8f8;
-                    color: black;
-                    border: 1px solid #bbb;
+                    background: #eaf0fa;
+                    color: #222b3a;
+                    border: 1px solid #b0bed9;
                     border-radius: 6px;
                 }
                 QPushButton:hover {
-                    background: #e0e0e0;
+                    background: #dbe7f6;
                 }
                 QPushButton:pressed {
-                    background: #cccccc;
+                    background: #b0bed9;
                 }
                 """
             )
