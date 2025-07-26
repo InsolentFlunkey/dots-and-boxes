@@ -3,7 +3,7 @@ import random
 import os
 import json
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QLabel, QMenuBar, QMenu, QInputDialog, QGridLayout, QHBoxLayout, QSizePolicy, QTableWidget, QTableWidgetItem, QPushButton, QDialog, QDialogButtonBox, QCheckBox, QMessageBox
+    QApplication, QWidget, QVBoxLayout, QLabel, QMenuBar, QMenu, QInputDialog, QGridLayout, QHBoxLayout, QSizePolicy, QTableWidget, QTableWidgetItem, QPushButton, QDialog, QDialogButtonBox, QCheckBox, QMessageBox, QRadioButton, QButtonGroup
 )
 from PySide6.QtGui import QPainter, QPen, QColor, QAction
 from PySide6.QtCore import Qt, QRectF, QSize, QTimer
@@ -446,31 +446,45 @@ class WhoGoesFirstDialog(QDialog):
         self.label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.label)
 
-        btn_layout = QHBoxLayout()
-        self.btn_player = QPushButton(player_name)
-        self.btn_computer = QPushButton("Computer")
-        btn_layout.addWidget(self.btn_player)
-        btn_layout.addWidget(self.btn_computer)
-        layout.addLayout(btn_layout)
 
         if not animation_only:
-            self.btn_random = QPushButton("Random")
-            btn_layout.addWidget(self.btn_random)
-            self.btn_player.clicked.connect(lambda: self._choose(0))
-            self.btn_computer.clicked.connect(lambda: self._choose(1))
-            self.btn_random.clicked.connect(self._start_anim_remember)
+            self.radio_group = QButtonGroup(self)
+            self.radio_player = QRadioButton(player_name)
+            self.radio_computer = QRadioButton("Computer")
+            self.radio_random = QRadioButton("Random")
+            self.radio_group.addButton(self.radio_player, 0)
+            self.radio_group.addButton(self.radio_computer, 1)
+            self.radio_group.addButton(self.radio_random, 2)
+            radio_layout = QHBoxLayout()
+            radio_layout.addWidget(self.radio_player)
+            radio_layout.addWidget(self.radio_computer)
+            radio_layout.addWidget(self.radio_random)
+            layout.addLayout(radio_layout)
+            # Preselect
+            if preselect == 0:
+                self.radio_player.setChecked(True)
+            elif preselect == 1:
+                self.radio_computer.setChecked(True)
+            elif preselect == 'random':
+                self.radio_random.setChecked(True)
+            else:
+                self.radio_player.setChecked(True)
             self.remember_box = QCheckBox("Remember my choice")
             self.remember_box.setChecked(remember_checked)
-            # Preselect highlight
-            if preselect == 0:
-                self.btn_player.setStyleSheet("background: #e0e0e0; font-weight: bold;")
-            elif preselect == 1:
-                self.btn_computer.setStyleSheet("background: #e0e0e0; font-weight: bold;")
-            elif preselect == 'random':
-                self.btn_random.setStyleSheet("background: #e0e0e0; font-weight: bold;")
             layout.addWidget(self.remember_box)
+            # Submit button
+            btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            btn_box.accepted.connect(self._on_submit)
+            btn_box.rejected.connect(self.reject)
+            layout.addWidget(btn_box)
         else:
-            # In animation-only mode, disable buttons
+            # In animation-only mode, just run the animation
+            self.btn_player = QPushButton(player_name)
+            self.btn_computer = QPushButton("Computer")
+            btn_layout = QHBoxLayout()
+            btn_layout.addWidget(self.btn_player)
+            btn_layout.addWidget(self.btn_computer)
+            layout.addLayout(btn_layout)
             self.btn_player.setEnabled(False)
             self.btn_computer.setEnabled(False)
             QTimer.singleShot(300, self._start_anim)
@@ -478,23 +492,18 @@ class WhoGoesFirstDialog(QDialog):
         self.setLayout(layout)
         self.setFixedWidth(340)
 
-    def _start_anim_remember(self):
-        # Called when Random is clicked in full dialog
-        self.remember_random = self.remember_box.isChecked()
-        self._start_anim()
-
-    def _choose(self, who):
-        # If this was a remembered random, set selected to 'random' for config, but return the actual result for this game
-        if hasattr(self, 'remember_random') and self.remember_random:
-            self.selected = 'random'  # For config
-            self.remember = True
-            self._actual_random_result = who  # For this game only
-            self.accept()
+    def _on_submit(self):
+        idx = self.radio_group.checkedId()
+        if idx == 0:
+            self.selected = 0
+        elif idx == 1:
+            self.selected = 1
+        elif idx == 2:
+            self.selected = 'random'
         else:
-            self.selected = who
-            if not self.animation_only:
-                self.remember = self.remember_box.isChecked()
-            self.accept()
+            self.selected = 0
+        self.remember = self.remember_box.isChecked()
+        self.accept()
 
     def _start_anim(self):
         self.btn_player.setStyleSheet("")
@@ -512,7 +521,8 @@ class WhoGoesFirstDialog(QDialog):
         self.anim_index += 1
         if self.anim_index >= len(self.anim_list):
             self.anim_timer.stop()
-            self._choose(self.anim_final)
+            self.selected = self.anim_final
+            self.accept()
         else:
             self.anim_timer.start(self.anim_speeds[min(self.anim_index, len(self.anim_speeds)-1)])
 
@@ -695,20 +705,13 @@ class DotsAndBoxesGame(QWidget):
         if who_first is None:
             dlg = WhoGoesFirstDialog(player1_name, self)
             if dlg.exec() == QDialog.Accepted:
-                # If Random was chosen and remember is checked, store 'random' in config, but use the actual result for this game
-                if hasattr(dlg, 'remember_random') and dlg.remember_random:
-                    self.who_goes_first = 'random'
-                    self.remember_who_goes_first = True
-                    self.save_player_config(player1_name, grid_size, 'random', True)
-                    who_first = dlg._actual_random_result
+                who_first = dlg.selected
+                self.remember_who_goes_first = dlg.remember
+                if dlg.remember:
+                    self.who_goes_first = dlg.selected
                 else:
-                    who_first = dlg.selected
-                    self.remember_who_goes_first = dlg.remember
-                    if dlg.remember:
-                        self.who_goes_first = dlg.selected
-                    else:
-                        self.who_goes_first = None
-                    self.save_player_config(player1_name, grid_size, self.who_goes_first if self.remember_who_goes_first else None, self.remember_who_goes_first)
+                    self.who_goes_first = None
+                self.save_player_config(player1_name, grid_size, self.who_goes_first if self.remember_who_goes_first else None, self.remember_who_goes_first)
         if who_first == 'random':
             # Show only the animation dialog
             dlg = WhoGoesFirstDialog(player1_name, self, animation_only=True)
