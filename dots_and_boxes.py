@@ -704,8 +704,10 @@ class DotsAndBoxesGame(QWidget):
             self._start_new_game(self.grid_size, self.player1_name)
 
     def _start_new_game(self, grid_size, player1_name):
-        # Who goes first logic
-        # Always reload config to get latest values
+        who_first = self._determine_who_goes_first(grid_size, player1_name)
+        self._reset_board_and_start(grid_size, player1_name, who_first)
+
+    def _determine_who_goes_first(self, grid_size, player1_name):
         config = self.load_player_config()
         self.who_goes_first = config.get("who_goes_first", None)
         self.remember_who_goes_first = config.get("remember_who_goes_first", False)
@@ -721,17 +723,18 @@ class DotsAndBoxesGame(QWidget):
                     self.who_goes_first = None
                 self.save_player_config(player1_name, grid_size, self.who_goes_first if self.remember_who_goes_first else None, self.remember_who_goes_first)
         if who_first == 'random':
-            # Show only the animation dialog
             dlg = WhoGoesFirstDialog(player1_name, self, animation_only=True)
             if dlg.exec() == QDialog.Accepted:
                 who_first = dlg.selected
+        return who_first
+
+    def _reset_board_and_start(self, grid_size, player1_name, who_first):
         self.layout().removeWidget(self.board)
         self.board.deleteLater()
         self.board = DotsAndBoxesBoard(grid_size, player1_name)
         self.board.status_callback = self.update_status
         self.layout().insertWidget(1, self.board)  # after scoreboard
         self.update_status("")
-        # Set who goes first
         if who_first == 1:
             self.board.current_player = 1
             QTimer.singleShot(400, self.board.computer_move)
@@ -740,7 +743,7 @@ class DotsAndBoxesGame(QWidget):
         self.save_player_config(
             player1_name, grid_size, self.who_goes_first if self.remember_who_goes_first else None, 
             self.remember_who_goes_first
-            )
+        )
 
     def show_who_goes_first_dialog(self):
         # Determine preselect value
