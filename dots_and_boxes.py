@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QInputDialog, QHBoxLayout, QSizePolicy, QTableWidget, QTableWidgetItem, 
     QPushButton, QDialog, QDialogButtonBox, QCheckBox, QRadioButton, QButtonGroup, QMessageBox
 )
-from PySide6.QtGui import QPainter, QPen, QColor, QAction
+from PySide6.QtGui import QPainter, QPen, QColor, QAction, QPalette
 from PySide6.QtCore import Qt, QRectF, QSize, QTimer
 
 GRID_SIZE = 4  # 4x4 dots = 3x3 boxes
@@ -543,6 +543,7 @@ class DotsAndBoxesGame(QWidget):
         self.player1_name = config.get("player1_name", DEFAULT_PLAYER_NAME)
         self.who_goes_first = config.get("who_goes_first", None)  # 0=player, 1=computer, 'random', None=ask
         self.remember_who_goes_first = config.get("remember_who_goes_first", False)
+        self.dark_mode = config.get("dark_mode", None)
         self.menu_bar = QMenuBar(self)
         self.menu_bar.setNativeMenuBar(False)  # For cross-platform consistency
         self.game_menu = QMenu("Game", self)
@@ -551,10 +552,14 @@ class DotsAndBoxesGame(QWidget):
         self.action_new_same = QAction("New Game (Same Grid Size)", self)
         self.action_new_choose = QAction("New Game (Choose Grid Size)", self)
         self.action_set_name = QAction("Set Player 1 Name", self)
+        self.action_who_first = QAction("Who goes first...", self)
+        self.action_toggle_dark = QAction("Toggle Dark Mode", self)
         self.action_exit = QAction("Exit", self)
         self.game_menu.addAction(self.action_new_same)
         self.game_menu.addAction(self.action_new_choose)
         self.game_menu.addAction(self.action_set_name)
+        self.game_menu.addAction(self.action_who_first)
+        self.game_menu.addAction(self.action_toggle_dark)
         self.game_menu.addSeparator()
         self.game_menu.addAction(self.action_exit)
 
@@ -562,12 +567,10 @@ class DotsAndBoxesGame(QWidget):
         self.action_new_choose.triggered.connect(self.new_game_choose)
         self.action_set_name.triggered.connect(self.set_player1_name)
         self.action_exit.triggered.connect(self.close)
-
-        # Add menu item for 'Who goes first' dialog
-        self.action_who_first = QAction("Who goes first...", self)
-        self.game_menu.addAction(self.action_who_first)
         self.action_who_first.triggered.connect(self.show_who_goes_first_dialog)
+        self.action_toggle_dark.triggered.connect(self.toggle_dark_mode)
 
+        # Create the game board before adding to layout
         self.board = DotsAndBoxesBoard(self.grid_size, self.player1_name)
         self.board.status_callback = self.update_status
 
@@ -631,6 +634,14 @@ class DotsAndBoxesGame(QWidget):
         layout.addWidget(self.status_label)
         self.setLayout(layout)
         self.update_status("")
+
+        # Apply theme on startup (after scoreboard is created)
+        if self.dark_mode is not None:
+            self.apply_dark_mode(self.dark_mode)
+        else:
+            # Use system default
+            self.dark_mode = self.is_system_dark_mode()
+            self.apply_dark_mode(self.dark_mode)
 
         # Start a new game on app launch (shows 'Who goes first' dialog if needed)
         QTimer.singleShot(0, lambda: self._start_new_game(self.grid_size, self.player1_name))
@@ -788,16 +799,19 @@ class DotsAndBoxesGame(QWidget):
                 return {}
         return {}
 
-    def save_player_config(self, player1_name, grid_size, who_goes_first=None, remember_who_goes_first=False):
+    def save_player_config(self, player1_name, grid_size, who_goes_first=None, remember_who_goes_first=False, dark_mode=None):
         config_path = os.path.join(os.path.dirname(__file__), "player_config.json")
         try:
             with open(config_path, "w", encoding="utf-8") as f:
-                json.dump({
+                config = {
                     "player1_name": player1_name,
                     "grid_size": grid_size,
                     "who_goes_first": who_goes_first,
                     "remember_who_goes_first": remember_who_goes_first
-                }, f)
+                }
+                if dark_mode is not None:
+                    config["dark_mode"] = dark_mode
+                json.dump(config, f)
         except Exception:
             pass
 
@@ -814,6 +828,99 @@ class DotsAndBoxesGame(QWidget):
                 if any(row):
                     return True
         return False
+
+    def toggle_dark_mode(self):
+        self.dark_mode = not self.dark_mode
+        self.apply_dark_mode(self.dark_mode)
+        self.save_player_config(
+            self.player1_name, self.grid_size, self.who_goes_first if self.remember_who_goes_first else None,
+            self.remember_who_goes_first, self.dark_mode
+        )
+
+    def apply_dark_mode(self, enabled):
+        app = QApplication.instance()
+        if enabled:
+            dark_palette = QPalette()
+            dark_palette.setColor(QPalette.Window, QColor(30, 30, 30))
+            dark_palette.setColor(QPalette.WindowText, Qt.white)
+            dark_palette.setColor(QPalette.Base, QColor(20, 20, 20))
+            dark_palette.setColor(QPalette.AlternateBase, QColor(30, 30, 30))
+            dark_palette.setColor(QPalette.ToolTipBase, Qt.white)
+            dark_palette.setColor(QPalette.ToolTipText, Qt.white)
+            dark_palette.setColor(QPalette.Text, Qt.white)
+            dark_palette.setColor(QPalette.Button, QColor(45, 45, 45))
+            dark_palette.setColor(QPalette.ButtonText, Qt.white)
+            dark_palette.setColor(QPalette.BrightText, Qt.red)
+            dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
+            dark_palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+            dark_palette.setColor(QPalette.HighlightedText, Qt.black)
+            app.setPalette(dark_palette)
+            self._set_scoreboard_text_color('white')
+            app.setStyleSheet("""
+                QMenu { background-color: #222; color: white; }
+                QMenu::item:selected { background: #444; }
+            """)
+            self.show_last_move_btn.setStyleSheet(
+                """
+                QPushButton {
+                    padding: 6px 18px;
+                    background: #333;
+                    color: white;
+                    border: 1px solid #888;
+                    border-radius: 6px;
+                }
+                QPushButton:hover {
+                    background: #444;
+                }
+                QPushButton:pressed {
+                    background: #222;
+                }
+                """
+            )
+        else:
+            app.setPalette(app.style().standardPalette())
+            self._set_scoreboard_text_color('black')
+            app.setStyleSheet("""
+                QMenu { background-color: #f0f0f0; color: black; }
+                QMenu::item:selected { background: #d0d0d0; }
+            """)
+            self.show_last_move_btn.setStyleSheet(
+                """
+                QPushButton {
+                    padding: 6px 18px;
+                    background: #f8f8f8;
+                    color: black;
+                    border: 1px solid #bbb;
+                    border-radius: 6px;
+                }
+                QPushButton:hover {
+                    background: #e0e0e0;
+                }
+                QPushButton:pressed {
+                    background: #cccccc;
+                }
+                """
+            )
+
+    def _set_scoreboard_text_color(self, color):
+        self.scoreboard.setStyleSheet(f"""
+            QTableWidget {{
+                border: none;
+                gridline-color: #888;
+                background: transparent;
+            }}
+            QTableWidget::item {{
+                border: 1px solid #888;
+                padding: 6px;
+                background: transparent;
+                color: {color};
+            }}
+        """)
+
+    def is_system_dark_mode(self):
+        # Simple heuristic: check palette background color
+        app = QApplication.instance()
+        return app.palette().color(QPalette.Window).value() < 128
 
 def main():
     app = QApplication(sys.argv)

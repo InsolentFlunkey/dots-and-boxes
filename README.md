@@ -9,6 +9,7 @@ A classic "Dots and Boxes" (also known as "Squares" or "Boxes") pencil-and-paper
 - Variable grid sizes (choose your board size before each game)
 - Remembers your selected grid size between sessions
 - Customizable Player 1 name (remembers your name between runs)
+- "Who goes first" selection: choose Player, Computer, or Random (with animation and remember option)
 - Modern, table-style scoreboard with current player highlighting
 - Click lines to claim them; complete a square to score a point and take another turn
 - Play against a computer opponent with simple “smart” logic (not perfect AI)
@@ -17,6 +18,8 @@ A classic "Dots and Boxes" (also known as "Squares" or "Boxes") pencil-and-paper
 - Move blinking animation for both player and computer moves
 - "Show last move" button to highlight the previous move
 - Hover/preview effect: see a shadow of the line before clicking
+- Robust configuration persistence (player name, grid size, who goes first)
+- Improved code quality and maintainability (refactored for clarity and low complexity)
 
 ---
 
@@ -72,7 +75,6 @@ This project is intended to be **expanded and improved**. Some ideas for future 
 - [ ] **Game saving/loading**
 - [ ] **Score/history tracking**
 - [ ] **Packaging as an executable for Windows/macOS/Linux**
-- [ ] Who goes first: let the user choose or randomize who starts each game
 
 ---
 
