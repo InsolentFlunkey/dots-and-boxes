@@ -493,6 +493,9 @@ class DotsAndBoxesGame(QWidget):
         # Show last move button
         self.show_last_move_btn = QPushButton("Show last move")
         self.show_last_move_btn.clicked.connect(self.handle_show_last_move)
+        self.show_last_move_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.show_last_move_btn.setMinimumWidth(120)
+        self.show_last_move_btn.setStyleSheet("padding: 6px 18px;")
 
         # Center the scoreboard
         layout = QVBoxLayout()
@@ -503,7 +506,12 @@ class DotsAndBoxesGame(QWidget):
         scoreboard_hbox.addStretch(1)
         layout.addLayout(scoreboard_hbox)
         layout.addWidget(self.board)
-        layout.addWidget(self.show_last_move_btn)
+        # Center the button horizontally
+        btn_hbox = QHBoxLayout()
+        btn_hbox.addStretch(1)
+        btn_hbox.addWidget(self.show_last_move_btn)
+        btn_hbox.addStretch(1)
+        layout.addLayout(btn_hbox)
         layout.addWidget(self.status_label)
         self.setLayout(layout)
         self.update_status("")
