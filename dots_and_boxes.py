@@ -306,7 +306,7 @@ class DotsAndBoxesBoard(QWidget):
         if move is None:
             move = self._find_safe_move(moves)
         if move is None:
-            move = random.choice(moves)
+            move = self._find_least_damaging_move(moves)
         self._execute_computer_move(move)
 
     def _find_box_completing_move(self, moves):
@@ -320,6 +320,66 @@ class DotsAndBoxesBoard(QWidget):
     def _find_safe_move(self, moves):
         safe_moves = [move for move in moves if not self.move_makes_third_side(move)]
         return random.choice(safe_moves) if safe_moves else None
+
+    def _find_least_damaging_move(self, moves):
+        # For each move, simulate and count the full chain of boxes the opponent could claim
+        min_chain = None
+        best_moves = []
+        for move in moves:
+            test = self.copy_state()
+            test.make_move(*move, player=1)
+            chain = test._simulate_opponent_chain()
+            if min_chain is None or chain < min_chain:
+                min_chain = chain
+                best_moves = [move]
+            elif chain == min_chain:
+                best_moves.append(move)
+        return random.choice(best_moves) if best_moves else random.choice(moves)
+
+    def _simulate_opponent_chain(self):
+        # Simulate the opponent's turn, recursively claiming all possible boxes in a chain
+        total = 0
+        while True:
+            moves = self.available_moves()
+            best = None
+            best_count = 0
+            for move in moves:
+                count = self._count_new_boxes(*move, player=0)
+                if count > best_count:
+                    best_count = count
+                    best = move
+            if best and best_count > 0:
+                self.make_move(*best, player=0)
+                self.check_and_update_boxes_for_move(*best, player=0)
+                total += best_count
+            else:
+                break
+        return total
+
+    def _count_new_boxes(self, r, c, is_h, player):
+        # Count how many boxes are completed by this move
+        count = 0
+        adjacent = []
+        if is_h:
+            if r > 0:
+                adjacent.append((r - 1, c))
+            if r < self.grid_size - 1:
+                adjacent.append((r, c))
+        else:
+            if c > 0:
+                adjacent.append((r, c - 1))
+            if c < self.grid_size - 1:
+                adjacent.append((r, c))
+        for rr, cc in adjacent:
+            if (
+                self.h_lines[rr][cc] and
+                self.h_lines[rr + 1][cc] and
+                self.v_lines[rr][cc] and
+                self.v_lines[rr][cc + 1]
+            ):
+                if self.boxes[rr][cc] is None:
+                    count += 1
+        return count
 
     def _execute_computer_move(self, move):
         self.make_move(*move)
