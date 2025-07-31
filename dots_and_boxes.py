@@ -359,6 +359,18 @@ class DotsAndBoxesBoard(QWidget):
     def _count_new_boxes(self, r, c, is_h, player):
         # Count how many boxes are completed by this move
         count = 0
+        for rr, cc in self._adjacent_boxes(r, c, is_h):
+            if (
+                self.h_lines[rr][cc] and
+                self.h_lines[rr + 1][cc] and
+                self.v_lines[rr][cc] and
+                self.v_lines[rr][cc + 1] and
+                self.boxes[rr][cc] is None
+            ):
+                count += 1
+        return count
+
+    def _adjacent_boxes(self, r, c, is_h):
         adjacent = []
         if is_h:
             if r > 0:
@@ -370,16 +382,7 @@ class DotsAndBoxesBoard(QWidget):
                 adjacent.append((r, c - 1))
             if c < self.grid_size - 1:
                 adjacent.append((r, c))
-        for rr, cc in adjacent:
-            if (
-                self.h_lines[rr][cc] and
-                self.h_lines[rr + 1][cc] and
-                self.v_lines[rr][cc] and
-                self.v_lines[rr][cc + 1]
-            ):
-                if self.boxes[rr][cc] is None:
-                    count += 1
-        return count
+        return adjacent
 
     def _execute_computer_move(self, move):
         self.make_move(*move)
